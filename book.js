@@ -291,6 +291,10 @@ const writeIcs = (r) => {
 }
 
 const main = async () => {
+  // Fail before launching a browser or reading the decision. Cheap, deterministic, and lets CI
+  // exercise this check on a runner without Playwright installed.
+  credentials()
+
   const date = dayjs(DECISION.targetDate, 'YYYY-MM-DD')
   const whenIso = date.format('DD/MM/YYYY')
   const { preferCovered, hours: hoursPriority } = DECISION
