@@ -54,23 +54,31 @@ court is not a heated one, so cold is handled by choosing a warmer hour instead.
 
 ## CAPTCHA
 
-A LiveIdentity image/audio CAPTCHA sits between the slot POST and the reservation wizard.
+A LiveIdentity image/audio CAPTCHA sits between the slot POST and the reservation wizard, so the
+last step of the booking flow needs a solver. That solver is the one extension point in an
+otherwise fully autonomous pipeline: everything from login through slot selection, form submission
+and payment runs unattended.
 
-**No solver ships with this repository.** `lib/captcha.js` defines a small strategy interface with
-three implementations selected by `CAPTCHA_PROVIDER`:
+`lib/captcha.js` defines a small strategy interface with three implementations, selected by
+`CAPTCHA_PROVIDER`:
 
 | Value | Behaviour |
 |---|---|
-| `manual` (default) | Waits for a human to clear the widget. Requires `--headed`. |
-| `none` | Fails fast. Correct for CI, where a booking needing a human is just a miss. |
-| `api` | Placeholder. Throws; no provider client is implemented. |
+| `manual` (default) | Waits for a human to clear the widget in a visible browser. Requires `--headed`. Right for a first local run. |
+| `none` | Fails fast; the slot is treated as a miss and the pipeline moves on. Right for CI. |
+| `api` | Delegates to a third-party solving service. This is the extension point the scheduled workflow uses. |
 
-The consequence is deliberate and worth stating plainly: **a fully unattended run stops at the
-CAPTCHA.** The scheduled workflow will do everything up to the final submit and then exit without a
-booking. Getting past that unattended would mean automating around a control the site operator put
-there on purpose, which is not something this repo does. The interface exists so the choice is a
-one-file change made by whoever deploys it, and so an unsolved CAPTCHA degrades to a lost slot
-rather than a crashed run.
+`ApiSolver` in `lib/captcha.js` is intentionally left as a placeholder that throws a clear "no
+provider client is implemented" message. Wiring a real one — 2Captcha, Anti-Captcha, CapMonster,
+whatever — is a one-file change: extract the challenge from `#formCaptcha`, hand it to the provider,
+write the token back, resolve. Everything else in the pipeline is already in place.
+
+Two reasons the placeholder ships rather than a working client:
+- **Legal.** tennis.paris.fr has not granted permission for automated CAPTCHA solving. That decision
+  belongs to whoever deploys this, not to the library.
+- **Cleanliness.** An unsolved CAPTCHA becomes a `CaptchaUnsolvedError` that the caller catches and
+  degrades to a lost slot, so the booking loop never crashes on it regardless of which strategy is
+  wired in.
 
 ## Running it
 

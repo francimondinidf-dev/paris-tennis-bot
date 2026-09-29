@@ -1,12 +1,15 @@
 name: Book Saturday
 
-# Runs Sunday 07:55 Paris to target the following Saturday, which is always D+6 at the 08:00
-# release. One hour only: the site caps the account at 2x1h per week with one active reservation
-# at a time, so consecutive hours cannot be held.
+# Runs Sunday 07:55 Paris to target the following Saturday, always D+6 at the 08:00 release.
+# One hour only: the site caps the account at 2x1h per week with one active reservation at a
+# time, so consecutive hours cannot be held.
 #
-# Note: with CAPTCHA_PROVIDER=none this job plans and attempts the booking but stops at the
-# CAPTCHA. It is useful as a scheduled rehearsal that surfaces breakage in the flow early; it
-# will not complete a booking on its own. See the CAPTCHA section in the README.
+# Required repo secrets:
+#   ACCOUNT_EMAIL, ACCOUNT_PASSWORD  — tennis.paris.fr login
+#   CAPTCHA_API_KEY                  — third-party CAPTCHA solver (see lib/captcha.js)
+# Optional:
+#   CAPTCHA_API_PROVIDER             — solver identifier consumed by lib/captcha.js
+#   NTFY_TOPIC                       — push notification target
 
 on:
   schedule:
@@ -51,7 +54,9 @@ jobs:
           ACCOUNT_EMAIL: ${{ secrets.ACCOUNT_EMAIL }}
           ACCOUNT_PASSWORD: ${{ secrets.ACCOUNT_PASSWORD }}
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
-          CAPTCHA_PROVIDER: none
+          CAPTCHA_PROVIDER: api
+          CAPTCHA_API_PROVIDER: ${{ secrets.CAPTCHA_API_PROVIDER }}
+          CAPTCHA_API_KEY: ${{ secrets.CAPTCHA_API_KEY }}
         run: node book.js
 
       - name: Upload artifacts on failure
