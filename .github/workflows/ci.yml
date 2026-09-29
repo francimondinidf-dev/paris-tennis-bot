@@ -47,7 +47,10 @@ jobs:
 
       - name: Booking phase refuses to run without credentials
         run: |
-          if node book.js --dry-run 2>&1 | tee /tmp/out; then
-            echo "expected a non-zero exit"; exit 1
-          fi
+          # Capture node's exit code directly; a pipe to tee would swallow it.
+          set +e
+          node book.js --dry-run > /tmp/out 2>&1
+          rc=$?
+          cat /tmp/out
+          if [ "$rc" -eq 0 ]; then echo "expected a non-zero exit, got 0"; exit 1; fi
           grep -q 'ACCOUNT_EMAIL and ACCOUNT_PASSWORD must be set' /tmp/out
