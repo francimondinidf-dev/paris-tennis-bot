@@ -12,9 +12,10 @@ name: Book Saturday
 #   NTFY_TOPIC                       — push notification target
 
 on:
-  schedule:
-    - cron: '55 6 * * 0' # 07:55 Paris while CET (UTC+1)
-    - cron: '55 5 * * 0' # 07:55 Paris while CEST (UTC+2)
+  # Weekly schedule, disabled until the secrets above are configured. Uncomment to go autonomous.
+  # schedule:
+  #   - cron: '55 6 * * 0' # 07:55 Paris while CET (UTC+1)
+  #   - cron: '55 5 * * 0' # 07:55 Paris while CEST (UTC+2)
   workflow_dispatch: {}
 
 jobs:
@@ -28,7 +29,8 @@ jobs:
           node-version: '20'
           cache: npm
 
-      # Both crons fire year-round; only one of them is actually 07:55 in Paris today.
+      # Slots only exist at the 08:00 release, so a run started at any other time stops here.
+      # When scheduled, both crons fire year-round and only one of them is 07:55 in Paris.
       - name: Skip unless close to the Paris 08:00 release
         run: |
           PARIS_NOW=$(TZ=Europe/Paris date +%H:%M)

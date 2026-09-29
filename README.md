@@ -66,7 +66,7 @@ and payment runs unattended.
 |---|---|
 | `manual` (default) | Waits for a human to clear the widget in a visible browser. Requires `--headed`. Right for a first local run. |
 | `none` | Fails fast; the slot is treated as a miss and the pipeline moves on. Right for CI. |
-| `api` | Delegates to a third-party solving service. This is the extension point the scheduled workflow uses. |
+| `api` | Delegates to a third-party solving service. This is the extension point the booking workflow uses. |
 
 `ApiSolver` in `lib/captcha.js` is intentionally left as a placeholder that throws a clear "no
 provider client is implemented" message. Wiring a real one — 2Captcha, Anti-Captcha, CapMonster,
@@ -121,7 +121,7 @@ do here:
 
 - **Two 1-hour slots per week**, one reservation per day, and only one *active* reservation at a
   time. Back-to-back hours on one day are not obtainable, and a Saturday/Sunday pair cannot be held
-  in advance. This is why only one booking workflow is scheduled: a second one would collide with
+  in advance. This is why there is only one booking workflow: a second scheduled one would collide with
   the first booking and always return exit code 3. Use `workflow_dispatch` with `TARGET_DATE` for
   a different day.
 - **Payment uses an existing carnet.** The bot spends pre-paid hours; it never enters card details.
