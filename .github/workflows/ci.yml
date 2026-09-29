@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch: {}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Every module parses
+        run: |
+          for f in book.js precompute.js build-venues.js lib/*.js; do
+            node --check "$f"
+          done
+
+      - name: Shipped data is valid and carries no credentials
+        run: |
+          for f in data/*.json config.json.sample; do
+            node -e "JSON.parse(require('fs').readFileSync('$f','utf8'))"
+          done
+          ! grep -rIniE '"(password|email)"[[:space:]]*:[[:space:]]*"[^"]+"' data/ config.json.sample
+
+      # Runs the whole planning phase for real: live Open-Meteo call, venue ranking, decision.json.
+      # Needs no credentials, so it is the cheapest end-to-end signal that the pipeline is intact.
+      - name: Planning phase runs end to end
+        run: |
+          cp config.json.sample config.json
+          node precompute.js
+          node -e "
+            const d = JSON.parse(require('fs').readFileSync('decision.json','utf8'));
+            if (!d.venues?.length) throw new Error('no venues ranked');
+            if (!d.hours?.length) throw new Error('no hours chosen');
+            console.log('ranked', d.venues.length, 'venues; hours', d.hours.join(','));
+          "
+
+      - name: Booking phase refuses to run without credentials
+        run: |
+          if node book.js --dry-run 2>&1 | tee /tmp/out; then
+            echo "expected a non-zero exit"; exit 1
+          fi
+          grep -q 'ACCOUNT_EMAIL and ACCOUNT_PASSWORD must be set' /tmp/out

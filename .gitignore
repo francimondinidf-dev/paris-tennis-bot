@@ -1,0 +1,13 @@
+node_modules/
+
+# Secrets and local settings
+.env
+.env.local
+config.json
+
+# Generated at runtime
+decision.json
+artifacts/
+*.ics
+*.log
+.DS_Store

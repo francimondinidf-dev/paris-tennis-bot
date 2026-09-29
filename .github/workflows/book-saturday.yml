@@ -1,0 +1,64 @@
+name: Book Saturday
+
+# Runs Sunday 07:55 Paris to target the following Saturday, which is always D+6 at the 08:00
+# release. One hour only: the site caps the account at 2x1h per week with one active reservation
+# at a time, so consecutive hours cannot be held.
+#
+# Note: with CAPTCHA_PROVIDER=none this job plans and attempts the booking but stops at the
+# CAPTCHA. It is useful as a scheduled rehearsal that surfaces breakage in the flow early; it
+# will not complete a booking on its own. See the CAPTCHA section in the README.
+
+on:
+  schedule:
+    - cron: '55 6 * * 0' # 07:55 Paris while CET (UTC+1)
+    - cron: '55 5 * * 0' # 07:55 Paris while CEST (UTC+2)
+  workflow_dispatch: {}
+
+jobs:
+  book:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      # Both crons fire year-round; only one of them is actually 07:55 in Paris today.
+      - name: Skip unless close to the Paris 08:00 release
+        run: |
+          PARIS_NOW=$(TZ=Europe/Paris date +%H:%M)
+          echo "Paris time: $PARIS_NOW"
+          case "$PARIS_NOW" in
+            07:5[0-9]|08:0[0-2]) echo "In window, proceeding" ;;
+            *) echo "Outside booking window, stopping"; exit 0 ;;
+          esac
+
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: cp config.json.sample config.json
+
+      - name: Plan (weather + venue order)
+        run: node precompute.js
+
+      - name: Hold until 07:59:50 Paris
+        run: |
+          while [ "$(TZ=Europe/Paris date +%H%M%S)" -lt 075950 ]; do sleep 1; done
+
+      - name: Book
+        env:
+          ACCOUNT_EMAIL: ${{ secrets.ACCOUNT_EMAIL }}
+          ACCOUNT_PASSWORD: ${{ secrets.ACCOUNT_PASSWORD }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          CAPTCHA_PROVIDER: none
+        run: node book.js
+
+      - name: Upload artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: book-saturday-artifacts
+          path: artifacts/
+          if-no-files-found: ignore
+          retention-days: 7

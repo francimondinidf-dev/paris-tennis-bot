@@ -1,0 +1,24 @@
+{
+  "name": "paris-tennis-bot",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Weather-aware court booking for tennis.paris.fr — ranks 40 municipal venues by transit time and books at the 08:00 release",
+  "license": "MIT",
+  "scripts": {
+    "precompute": "node precompute.js",
+    "book": "node book.js",
+    "book:dry": "node book.js --dry-run",
+    "book:headed": "node book.js --headed",
+    "build:venues": "node build-venues.js",
+    "start": "node precompute.js && node book.js"
+  },
+  "engines": {
+    "node": ">=20.6.0"
+  },
+  "dependencies": {
+    "dayjs": "^1.11.13",
+    "dotenv": "^16.4.5",
+    "ics": "^3.7.6",
+    "playwright": "^1.48.0"
+  }
+}

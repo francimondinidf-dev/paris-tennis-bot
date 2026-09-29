@@ -1,0 +1,23 @@
+{
+  "home": {
+    "lat": 48.8566,
+    "lon": 2.3522,
+    "label": "Example origin — central Paris"
+  },
+  "hourPreferences": {
+    "warm": [10, 18],
+    "coldCandidates": [10, 11, 12, 13, 14, 15, 16, 17]
+  },
+  "weather": {
+    "coldTempC": 9,
+    "rainProbabilityPct": 40,
+    "rainMmThreshold": 0.2
+  },
+  "priceType": ["Tarif plein", "Tarif réduit"],
+  "courtType": ["Découvert"],
+  "players": [],
+  "maxVenuesToTry": 15,
+  "ntfy": {
+    "enable": false
+  }
+}
