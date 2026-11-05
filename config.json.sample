@@ -1,23 +1,60 @@
 {
+  "enabled": false,
+  "dormantNote": "Booking is off. book.js exits until this is true. scan.js and --dry-run still work.",
   "home": {
     "lat": 48.8566,
     "lon": 2.3522,
     "label": "Example origin — central Paris"
   },
-  "hourPreferences": {
-    "warm": [10, 18],
-    "coldCandidates": [10, 11, 12, 13, 14, 15, 16, 17]
+  "transitModel": {
+    "intercept": 26.01,
+    "minutesPerKm": 1.57
   },
-  "weather": {
-    "coldTempC": 9,
-    "rainProbabilityPct": 40,
-    "rainMmThreshold": 0.2
+  "days": [
+    "Saturday",
+    "Sunday"
+  ],
+  "season": {
+    "coveredMonths": [
+      11,
+      12,
+      1,
+      2,
+      3
+    ],
+    "outdoorMonths": [
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10
+    ]
   },
-  "priceType": ["Tarif plein", "Tarif réduit"],
-  "courtType": ["Découvert"],
-  "players": [],
-  "maxVenuesToTry": 15,
+  "hours": {
+    "warmOrder": [
+      10,
+      11,
+      9,
+      12
+    ],
+    "coldOrder": [
+      14,
+      13,
+      15,
+      12
+    ]
+  },
+  "ranking": {
+    "hourStepPenaltyMinutes": 15,
+    "maxTransitMinutes": 45,
+    "maxVenuesToScan": 20
+  },
+  "partner": null,
+  "captchaManualTimeoutSec": 600,
   "ntfy": {
-    "enable": false
+    "enable": false,
+    "topic": "REPLACE_OR_USE_ENV_NTFY_TOPIC"
   }
 }

@@ -21,7 +21,7 @@ jobs:
 
       - name: Every module parses
         run: |
-          for f in book.js precompute.js build-venues.js lib/*.js; do
+          for f in book.js scan.js build-venues.js lib/*.js; do
             node --check "$f"
           done
 
@@ -32,18 +32,24 @@ jobs:
           done
           ! grep -rIniE '"(password|email)"[[:space:]]*:[[:space:]]*"[^"]+"' data/ config.json.sample
 
-      # Runs the whole planning phase for real: live Open-Meteo call, venue ranking, decision.json.
-      # Needs no credentials, so it is the cheapest end-to-end signal that the pipeline is intact.
+      # Planning phase end to end: target days, season, hour choice, decision.json.
+      # Does not touch the booking site, so it is safe to run on every push.
       - name: Planning phase runs end to end
         run: |
           cp config.json.sample config.json
-          node precompute.js
+          node scan.js --plan-only
           node -e "
             const d = JSON.parse(require('fs').readFileSync('decision.json','utf8'));
-            if (!d.venues?.length) throw new Error('no venues ranked');
-            if (!d.hours?.length) throw new Error('no hours chosen');
-            console.log('ranked', d.venues.length, 'venues; hours', d.hours.join(','));
+            if (!d.days?.length) throw new Error('no target days');
+            for (const x of d.days) if (!x.hours?.length || !x.courtType) throw new Error('incomplete plan for ' + x.date);
+            console.log(d.days.map(x => x.date + ' ' + x.courtType + ' ' + x.hours.join('/')).join('; '));
           "
+
+      - name: Sample config keeps the booker dormant
+        run: |
+          cp config.json.sample config.json
+          node book.js | tee /tmp/out
+          grep -q 'dormant' /tmp/out
 
       - name: Booking phase refuses to run without credentials
         run: |

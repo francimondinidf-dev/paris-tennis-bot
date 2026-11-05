@@ -1,56 +1,67 @@
 # paris-tennis-bot
 
-Books a municipal tennis court on [tennis.paris.fr](https://tennis.paris.fr) at the moment slots
-are released, picking the court that is quickest to reach and switching to a covered one when the
-forecast says rain.
+Finds and books a weekend tennis hour on **Paris Tennis Padel**
+([tennispadel.paris.fr](https://tennispadel.paris.fr)), the City of Paris platform that replaced
+tennis.paris.fr on 4 November 2026.
 
-Paris releases every court for a given day at **08:00, exactly six days ahead**. Popular slots are
-gone within seconds. That deadline is the whole design constraint: by the time the release lands
-there is no budget left for deciding *where* to play, so all of that work happens beforehand.
+**Status: dormant.** `config.enabled` is `false` in the sample config, so `book.js` exits without
+doing anything. `scan.js` is read-only and needs no account.
+
+## What it picks
+
+| | Rule |
+|---|---|
+| Days | Saturday or Sunday |
+| Court type | **Covered Nov–Mar, outdoor Apr–Oct** (`config.season`) |
+| Hours, Apr–Oct | 10h, then 11h, 9h, 12h (`hours.warmOrder`) |
+| Hours, Nov–Mar | warmest part of the day: 14h, 13h, 15h, 12h (`hours.coldOrder`) |
+| Weather | not used: season alone decides court type and hours |
+| Venue order | transit minutes + 15 min per step away from the first-choice hour; venues over 45 min skipped |
+
+## Site rules (FAQ and règlement, read 2026-11-05)
+
+- Slots open **14 days ahead** (measured: D+14 has slots, D+15 none). The release **time is not yet
+  confirmed** on the new site; the old one released at 08:00. `npm run horizon` just before and after
+  08:00 settles it.
+- **One active booking at a time**: the next one can only be made once the current one is played.
+- 2 h per week (Mon–Sun) as booker, plus 2 h as a partner; at most 1 h per day as booker.
+- **No solo play**: a partner (name, first name, date of birth) must be on the booking before the
+  hour starts. They can be added after booking, until a few minutes before.
+- Cancel at least 24 h ahead or the hour is billed. 5 no-shows a year block the account for a month.
+- ID is checked at reception for the booker and partners.
 
 ## How it works
 
-The run is split into a slow planning phase and a fast execution phase.
-
 ```
-07:55  precompute.js                      ← no deadline pressure
-       ├─ Open-Meteo hourly forecast for the target date
-       ├─ decide: covered court needed? which hours, in what order?
-       ├─ rank venues by door-to-door transit time
-       └─ write decision.json
-
-07:59:50  book.js                         ← every second counts
-       ├─ log in (paid for before the release, not during)
-       ├─ one ajax_disponibilite_map call → which venues have anything free
-       ├─ walk viable venues in preference order, read slot buttons
-       └─ submit the first slot that matches, then the payment wizard
+scan.js / book.js
+  plan       lib/plan.js     target days → court type and hours by season
+  scan       lib/ranker.js   one GET per venue returns every free slot for D+1..D+14
+  book       book.js         login (Mon Paris, email → Continuer → password)
+                             preflight: no active booking, under 2 h this week
+                             wait for release → check radio[value=slotId] → "Réserver ce créneau"
+  CAPTCHA    lib/captcha.js  strategy interface, see below
+  step 1     reservation-etape-1: hands over to a human (partner, carnet payment, confirm)
 ```
 
-Two decisions carry most of the latency budget:
+The steps after the CAPTCHA (partner, payment, confirmation) are not automated yet because they
+have not been observed on the new site. `book.js` saves `logs/etape-1.html` on the first real run
+so they can be mapped.
 
-**Log in before the release, not after.** Authentication costs a few seconds. Doing it at 07:59:50
-means the first search request fires the instant slots open.
+## Commands
 
-**One triage call before any page loads.** `ajax_disponibilite_map` returns GeoJSON for every venue
-with an `available` flag. Filtering on that first avoids a full page load for venues that cannot
-yield a booking. Combined with blocking images, fonts, map tiles and analytics, a venue attempt
-drops from roughly 25 seconds to about two.
+```bash
+npm install
+npx playwright install chromium
+cp config.json.sample config.json   # set home, transitModel, preferences
+cp .env.example .env                # ACCOUNT_EMAIL / ACCOUNT_PASSWORD (Mon Paris)
 
-## Venue ranking
-
-`build-venues.js` produces the ranking input. It joins the site's venue catalogue against a set of
-measured door-to-door transit times, which is harder than it sounds because the site renames venues
-(`TEP Jean-Pierre Wimille` becomes `Broquedis - Asnières`), so names cannot be joined directly.
-
-The approach: use GPS distance as the backbone, since every venue has coordinates. Where a
-confident token-overlap name match exists, keep the real measured transit time. For the rest, fit
-`minutes = a + b·km` by least squares on the matched pairs and use it to fill the gaps. Every venue
-then carries a transit estimate in the same unit, tagged `measured` or `estimated` so the
-provenance stays visible rather than being quietly averaged away.
-
-Weather only overrides distance when it has to. Rain promotes venues with a covered court, because
-an outdoor court is useless in the rain regardless of how close it is. Cold does not: a covered
-court is not a heated one, so cold is handled by choosing a warmer hour instead.
+npm run venues      # rebuild data/venue-catalogue.json from the live site
+npm run scan        # nearest weekend day with a matching slot, next 14 days
+npm run scan:snipe  # only the day that opens today (D+14), when it is a Sat/Sun
+node scan.js --date=2026-11-21
+npm run horizon     # furthest open day right now
+npm run book:dry    # logs in, checks counters, picks a slot, stops before "Réserver"
+```
 
 ## CAPTCHA
 
@@ -80,66 +91,29 @@ Two reasons the placeholder ships rather than a working client:
   degrades to a lost slot, so the booking loop never crashes on it regardless of which strategy is
   wired in.
 
-## Running it
+### On the new site
 
-```bash
-npm install
-npx playwright install chromium
+The widget moved: on Paris Tennis Padel it runs when "Réserver ce créneau" is clicked on a centre
+page. A passed invisible check goes straight to `reservation-etape-1`; otherwise
+`#tc-centre-sportif-modal-captchaModal` opens with an icon/audio challenge. Each strategy now
+resolves once the page reaches `reservation-etape-1`.
 
-cp config.json.sample config.json   # hour preferences, weather thresholds, court types
-cp .env.example .env                # ACCOUNT_EMAIL / ACCOUNT_PASSWORD
+## Site contract (observed 2026-11-05)
 
-node precompute.js                  # writes decision.json
-node book.js --dry-run              # stages the booking POST without submitting
-node book.js --headed               # real run, CAPTCHA solvable by hand
-```
+- Venues: `Portal.jsp?page=paristennis&sport=1`, one `<li class="equipement-list-item" id data-lat data-lng>` each.
+- Slots: `Portal.jsp?page=centre-sportif&id=<venue>` lists every free slot for D+1..D+14, without
+  login. `<h3>` day → court `<li data-js-center-slot-container>` (covered/outdoor, surface) →
+  `input[name=creneauRadio][value=<slotId>]` with hour and price.
+- Booking: `Portal.jsp?page=reservation-etape-1&id=<slotId>&li-antibot-token=…&idCentre=<venue>`.
+- Occupancy grid: `rest/paristennis/creneaux?idEquipement=<venue>&date=YYYY-MM-DD` → `{html, date}`.
+- Profile: `page=reservations` (active booking), `page=infos` (hours played, absences), `page=carnets`.
 
-Credentials are read from the environment only, never from `config.json`, so a checked-in config
-can never carry an account.
-
-Useful flags: `--at=08:00:00` holds after login until a given Paris time, `--max-venues=N` caps
-attempts, `--dry-run` stops before submitting.
-
-Exit codes: `0` booked, `1` error, `2` no bookable slot, `3` account already holds a reservation.
-
-### Shipped data
-
-`data/venues.json` is generated for the example origin in `config.json.sample`, a central-Paris
-reference point. The transit times in it are **not** meaningful for any other address. Set your own
-`home` coordinates and run `npm run build:venues` to regenerate.
+## Data
 
 | File | Contents |
 |---|---|
-| `data/venue-catalogue.json` | Venue and court catalogue scraped from the site: coordinates, surfaces, covered flags. |
-| `data/transit-measurements.json` | Measured door-to-door transit times used to fit the distance model. |
-| `data/venues.json` | Generated join of the two. Consumed by `lib/ranker.js`. |
+| `data/venue-catalogue.json` | Venues and courts scraped from the site: coordinates, address, surfaces, covered flags. No home-specific data. |
+| `data/transit-measurements.json` | Measured door-to-door transit times, used when a venue name matches. Not meaningful for other addresses. |
 
-## Site constraints
-
-These are the site's rules, not limitations of the code, and they bound what any booking tool can
-do here:
-
-- **Two 1-hour slots per week**, one reservation per day, and only one *active* reservation at a
-  time. Back-to-back hours on one day are not obtainable, and a Saturday/Sunday pair cannot be held
-  in advance. This is why there is only one booking workflow: a second scheduled one would collide with
-  the first booking and always return exit code 3. Use `workflow_dispatch` with `TARGET_DATE` for
-  a different day.
-- **Payment uses an existing carnet.** The bot spends pre-paid hours; it never enters card details.
-  `courtType` is therefore a hard constraint, not a preference, since a court type outside the
-  carnet would put a real card payment in the middle of the flow.
-- **Court coverage comes from local data.** The results page frequently returns `indoorOutdoor` as
-  null, so `data/venues.json` is authoritative. A court unknown to both sources is refused rather
-  than guessed at.
-
-## Notes
-
-Written for personal use against my own account. It automates a form a logged-in user is entitled
-to submit, at a volume far below manual browsing, and it does not attempt to bypass the site's
-anti-bot controls. If you run it, that is your call to make against the site's terms.
-
-`lib/ntfy.js` is adapted from [par-ici-tennis](https://github.com/bertrandda/par-ici-tennis) by
-Bertrand d'Aure (MIT); the reverse-engineered booking flow, weather logic, and venue ranking here
-are my own. See [LICENSE](LICENSE).
-
-Built with AI coding assistance. The reverse-engineering of the site's request flow, the design
-decisions described above, and the review of what shipped are mine.
+Distance and transit are computed at run time from `config.home` and `config.transitModel`.
+Credentials come from the environment only, never from `config.json`.
