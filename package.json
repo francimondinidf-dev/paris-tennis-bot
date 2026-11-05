@@ -1,16 +1,16 @@
 {
   "name": "paris-tennis-bot",
-  "version": "1.0.0",
+  "version": "0.2.0",
   "type": "module",
-  "description": "Weather-aware court booking for tennis.paris.fr — ranks 40 municipal venues by transit time and books at the 08:00 release",
-  "license": "MIT",
+  "description": "Weekend court finder/booker for tennispadel.paris.fr (Paris Tennis Padel). Dormant by default.",
   "scripts": {
-    "precompute": "node precompute.js",
-    "book": "node book.js",
+    "venues": "node build-venues.js",
+    "scan": "node scan.js",
+    "scan:snipe": "node scan.js --mode=snipe",
+    "horizon": "node scan.js --horizon",
     "book:dry": "node book.js --dry-run",
-    "book:headed": "node book.js --headed",
-    "build:venues": "node build-venues.js",
-    "start": "node precompute.js && node book.js"
+    "book": "node book.js",
+    "build:venues": "node build-venues.js"
   },
   "engines": {
     "node": ">=20.6.0"

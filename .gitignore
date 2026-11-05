@@ -11,3 +11,9 @@ artifacts/
 *.ics
 *.log
 .DS_Store
+
+# Local-only: browser session, run logs, site recon, pre-2026-11 code
+.browser-profile/
+logs/
+recon/
+legacy/
